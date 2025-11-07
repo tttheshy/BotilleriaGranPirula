@@ -1,0 +1,155 @@
+/* ========== La gran Pirula — Tema Negro & Dorado ========== */
+:root{
+  --bg: #0b0b0b;
+  --bg-2: #141414;
+  --text: #f5f5f5;
+  --muted: #bdbdbd;
+  --gold: #d4af37;
+  --gold-2: #b8911f;
+  --border: #2a2a2a;
+  --ok: #14b87a;
+  --warn: #ff9f1c;
+  --danger: #ff5c5c;
+  --radius: 14px;
+  --shadow: 0 8px 30px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body{
+  margin:0;
+  background:
+    radial-gradient(1000px 600px at 120% -10%, rgba(212,175,55,.07), transparent 60%),
+    radial-gradient(800px 500px at -10% 110%, rgba(212,175,55,.04), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+/* Links */
+a{ color: var(--gold); text-decoration: none; }
+a:hover{ text-decoration: underline; }
+
+/* Contenedores */
+.container{ max-width: 1100px; margin: 20px auto; padding: 0 12px; }
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* Navbar */
+.navbar{
+  position: sticky; top:0; z-index: 10;
+  backdrop-filter: blur(6px);
+  background: rgba(0,0,0,.6);
+  border-bottom: 1px solid var(--border);
+  display:flex; align-items:center; gap:14px; padding:10px 14px;
+}
+.brand{
+  color: var(--gold);
+  font-weight: 800;
+  letter-spacing:.4px;
+}
+.nav-link{
+  color: var(--text);
+  opacity:.85;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.nav-link:hover{ background: rgba(255,255,255,.06); }
+.nav-link.active{ text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; color: var(--gold); }
+.spacer{ margin-left:auto; }
+
+/* Inputs */
+input, select, textarea{
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input::placeholder{ color: #8b8b8b; }
+select{ cursor:pointer; }
+
+input:focus, select:focus, textarea:focus{
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212,175,55,.18);
+}
+
+/* Botones */
+button{
+  appearance: none;
+  border: 1px solid var(--gold);
+  background: var(--bg-2);
+  color: var(--gold);
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .02s ease-in;
+}
+button:hover{ background: var(--gold); color: #1a1a1a; }
+button:active{ transform: translateY(1px); }
+
+.btn-secondary{
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn-ghost{
+  border-color: transparent;
+  color: var(--muted);
+}
+.btn-ghost:hover{ background: rgba(255,255,255,.08); color: var(--text); }
+
+/* Tablas */
+table{ width:100%; border-collapse: collapse; }
+th, td{ padding: 10px 8px; }
+thead th{
+  text-align:left;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(212,175,55,.09), transparent);
+}
+tbody tr{ border-top: 1px solid var(--border); }
+tbody tr:hover{ background: rgba(255,255,255,.03); }
+
+/* Secciones de dos columnas */
+.grid-2{
+  display:grid; grid-template-columns: 1fr 1fr; gap:16px;
+}
+@media (max-width: 920px){ .grid-2{ grid-template-columns: 1fr; } }
+
+/* Mensajes */
+.msg-ok{ color: var(--ok); }
+.msg-warn{ color: var(--warn); }
+.msg-error{ color: var(--danger); }
+
+/* Badges */
+.badge-promo{
+  display:inline-block;
+  border:1px solid var(--gold);
+  color: var(--gold);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  margin-left: 6px;
+  background: rgba(212,175,55,.1);
+}
+
+/* Secciones sin tener que tocar tu JSX: estiliza <section> genérico */
+section{
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+}
+
+/* Scrollbar (Chromium) */
+::-webkit-scrollbar { height: 10px; width: 10px; }
+::-webkit-scrollbar-thumb { background: #2d2d2d; border-radius: 10px; border: 2px solid #1a1a1a; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
