@@ -10,7 +10,7 @@ export default function Perfil() {
   const [saving, setSaving] = useState(false);
 
   const role = (me?.role || "").toString().toUpperCase();
-  const isAdmin = ["OWNER","ADMIN"].includes(role) || me?.is_staff || me?.is_superuser;
+  const isAdmin = ["OWNER", "ADMIN"].includes(role) || me?.is_staff || me?.is_superuser;
 
   useEffect(() => {
     if (me) setEmail(me.email || "");
@@ -40,35 +40,35 @@ export default function Perfil() {
   if (loading || !me) return <div className="container"><h2>Perfil</h2><p>Cargando…</p></div>;
 
   return (
-    <div className="container" style={{maxWidth:700}}>
-      <h2>Perfil</h2>
+    <div className="container" style={{ maxWidth: 700 }}>
+      <h2>Perfil de Usuario</h2>
       {msg && <p className={msg.startsWith("✅") ? "msg-ok" : "msg-error"}>{msg}</p>}
 
-      <section className="card" style={{marginBottom:16}}>
-        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+      <form className="card" onSubmit={guardar} style={{ marginBottom: 16, paddingBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
-            <label>Usuario</label>
+            <label>Nombre de usuario</label>
             <input value={me.username} disabled />
           </div>
           <div>
             <label>Rol</label>
             <input value={role} disabled />
           </div>
-          <div>
-            <label>Correo</label>
+          <div style={{ gridColumn: "span 2" }}>
+            <label>Correo electrónico</label>
             <input
               value={email}
-              onChange={(e)=>setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={!isAdmin}
               placeholder="Correo"
             />
           </div>
-          <div>
+          <div style={{ gridColumn: "span 2" }}>
             <label>Nueva contraseña</label>
             <input
               type="password"
               value={password}
-              onChange={(e)=>setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               disabled={!isAdmin}
               placeholder="Dejar en blanco para no cambiar"
             />
@@ -76,20 +76,24 @@ export default function Perfil() {
         </div>
 
         {isAdmin ? (
-          <div style={{textAlign:"right", marginTop:12}}>
-            <button onClick={guardar} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</button>
+          <div style={{ textAlign: "right", marginTop: 20 }}>
+            <button type="submit" disabled={saving}>
+              {saving ? "Guardando…" : "Guardar cambios"}
+            </button>
           </div>
         ) : (
-          <p style={{marginTop:10, color:"#999"}}>Solo lectura. Pide a un administrador cambios de correo o contraseña.</p>
+          <p style={{ marginTop: 16, color: "#999" }}>
+            Solo lectura. Pide a un administrador cambios de correo o contraseña.
+          </p>
         )}
-      </section>
+      </form>
 
       <section className="card">
-        <h3 style={{marginTop:0}}>Información</h3>
-        <ul style={{margin:0, paddingLeft:18}}>
+        <h3 style={{ marginTop: 0 }}>Información adicional</h3>
+        <ul style={{ margin: 0, paddingLeft: 20, lineHeight: "1.8em" }}>
           <li><strong>ID:</strong> {me.id}</li>
-          <li><strong>Staff:</strong> {me.is_staff ? "Sí" : "No"}</li>
-          <li><strong>Superuser:</strong> {me.is_superuser ? "Sí" : "No"}</li>
+          <li><strong>Staff:</strong> {me.is_staff ? "✅ Sí" : "— No"}</li>
+          <li><strong>Superuser:</strong> {me.is_superuser ? "✅ Sí" : "— No"}</li>
         </ul>
       </section>
     </div>

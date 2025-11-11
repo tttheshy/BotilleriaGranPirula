@@ -1,181 +1,263 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 
-const TYPE_LABEL = { PCT: "%", FIXED: "$" };
+const TYPE_OPTIONS = [
+  { value: "PCT", label: "Porcentaje (%)" },
+  { value: "FIXED", label: "Monto fijo ($)" },
+];
+
+const TYPE_BADGE = {
+  PCT: "%",
+  FIXED: "CLP",
+};
+
+const CLP = new Intl.NumberFormat("es-CL", {
+  style: "currency",
+  currency: "CLP",
+  maximumFractionDigits: 0,
+});
+
+const EMPTY_FORM = {
+  name: "",
+  type: "PCT",
+  value: "",
+  active: true,
+  category: "",
+  products: [],
+};
 
 export default function Promos() {
   const [promos, setPromos] = useState([]);
-  const [cats, setCats] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
 
+  const categoryLookup = useMemo(() => {
+    const map = new Map();
+    categories.forEach((cat) => map.set(cat.id, cat.name));
+    return map;
+  }, [categories]);
 
-  const [form, setForm] = useState({
-    name: "",
-    type: "PCT",    
-    value: "",
-    active: true,
-    category: "",   
-    products: [],   
-  });
-
-  const load = async () => {
-    setLoading(true); setMsg("");
+  const loadData = async () => {
+    setLoading(true);
+    setMessage(null);
     try {
-      const [pRes, cRes, prdRes] = await Promise.all([
+      const [promRes, catRes, prodRes] = await Promise.all([
         api.get("/promotions/"),
         api.get("/categories/"),
-        api.get("/products/?page_size=1000"), 
+        api.get("/products/?page_size=1000"),
       ]);
-      setPromos(Array.isArray(pRes.data) ? pRes.data : []);
-      setCats(Array.isArray(cRes.data) ? cRes.data : []);
-      setProducts(Array.isArray(prdRes.data) ? prdRes.data : []);
-    } catch {
-      setMsg("No se pudo cargar promociones/catálogos.");
+
+      setPromos(Array.isArray(promRes.data) ? promRes.data : []);
+      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
+      setProducts(
+        Array.isArray(prodRes.data?.results)
+          ? prodRes.data.results
+          : Array.isArray(prodRes.data)
+          ? prodRes.data
+          : [],
+      );
+    } catch (error) {
+      console.error("Error al cargar datos de promociones", error);
+      setMessage({ type: "error", text: "No se pudieron cargar las promociones." });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const onChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm(f => ({ ...f, [name]: type === "checkbox" ? checked : value }));
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
-  const toggleProduct = (id) => {
-    setForm(f => {
-      const has = f.products.includes(id);
-      return { ...f, products: has ? f.products.filter(x => x !== id) : [...f.products, id] };
+  const toggleProduct = (productId) => {
+    setForm((prev) => {
+      const hasProduct = prev.products.includes(productId);
+      return {
+        ...prev,
+        products: hasProduct
+          ? prev.products.filter((id) => id !== productId)
+          : [...prev.products, productId],
+      };
     });
   };
 
-  const crear = async (e) => {
-    e.preventDefault(); setMsg("");
-    if (!form.name || !form.value) { setMsg("Nombre y valor son obligatorios."); return; }
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!form.name.trim() || form.value === "") {
+      setMessage({ type: "error", text: "Nombre y valor son obligatorios." });
+      return;
+    }
+
+    setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
         type: form.type,
         value: String(form.value),
-        active: !!form.active,
+        active: Boolean(form.active),
         category: form.category || null,
-        products: form.products
+        products: form.products,
       };
+
       await api.post("/promotions/", payload);
-      setMsg("✅ Promoción creada.");
-      setForm({ name:"", type:"PCT", value:"", active:true, category:"", products:[] });
-      load();
-    } catch (err) {
-      if (err?.response?.status === 403) setMsg("❌ Sin permisos (solo Admin/Owner).");
-      else setMsg("❌ Error al crear promoción.");
+      setMessage({ type: "success", text: "Promoción creada correctamente." });
+      setForm(EMPTY_FORM);
+      await loadData();
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        setMessage({ type: "error", text: "No tienes permisos para crear promociones." });
+      } else {
+        console.error("Error al crear la promoción", error);
+        setMessage({ type: "error", text: "No se pudo crear la promoción." });
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
-  const activar = async (p, active) => {
+  const handleToggleActive = async (promo, nextState) => {
     try {
-      await api.patch(`/promotions/${p.id}/`, { active });
-      load();
-    } catch { setMsg("No se pudo cambiar el estado de la promo."); }
+      await api.patch(`/promotions/${promo.id}/`, { active: nextState });
+      await loadData();
+    } catch (error) {
+      console.error("Error al cambiar estado de la promoción", error);
+      setMessage({ type: "error", text: "No se pudo cambiar el estado de la promoción." });
+    }
+  };
+
+  const handleDelete = async (promo) => {
+    if (!window.confirm(`¿Eliminar la promoción "${promo.name}"?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/promotions/${promo.id}/`);
+      setMessage({ type: "success", text: "Promoción eliminada." });
+      await loadData();
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        setMessage({ type: "error", text: "No tienes permisos para eliminar la promoción." });
+      } else {
+        console.error("Error al eliminar la promoción", error);
+        setMessage({ type: "error", text: "No se pudo eliminar la promoción." });
+      }
+    }
+  };
+
+  const formatValue = (promo) => {
+    if (promo.type === "PCT") {
+      return `${promo.value}%`;
+    }
+    const numeric = Number(promo.value);
+    return Number.isFinite(numeric) ? CLP.format(numeric) : promo.value;
   };
 
   return (
-    <div style={{maxWidth:1000, margin:"20px auto"}}>
+    <div style={{ maxWidth: 1000, margin: "20px auto" }}>
       <h2>Promociones</h2>
-      {msg && <p>{msg}</p>}
-
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
-        {/* Formulario nueva promo */}
-        <section style={{border:"1px solid #eee", borderRadius:8, padding:12}}>
-          <h3>Crear promoción</h3>
-          <form onSubmit={crear} style={{display:"grid", gap:8}}>
-            <label>Nombre
-              <input name="name" value={form.name} onChange={onChange} placeholder="p.ej. 10% Bebidas" />
-            </label>
-
-            <div style={{display:"flex", gap:8}}>
-              <label>Tipo
-                <select name="type" value={form.type} onChange={onChange}>
-                  <option value="PCT">Porcentaje (%)</option>
-                  <option value="FIXED">Monto fijo ($)</option>
-                </select>
+      {message && (
+        <div
+          style={{
+            borderRadius: 8,
+            padding: "12px 16px",
+            background: message.type === "error" ? "#fee2e2" : "#dcfce7",
+            color: message.type === "error" ? "#b91c1c" : "#166534",
+          }}
+        >
+          {message.text}
+        </div>
+      )}
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8, marginTop: 12 }}>
+        <label>Nombre
+          <input name="name" value={form.name} onChange={handleChange} placeholder="Ej: 10% bebidas" />
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <label>Tipo
+            <select name="type" value={form.type} onChange={handleChange}>
+              <option value="PCT">Porcentaje (%)</option>
+              <option value="FIXED">Monto fijo ($)</option>
+            </select>
+          </label>
+          <label>Valor
+            <input name="value" type="number" step="1" value={form.value} onChange={handleChange} />
+          </label>
+        </div>
+        <label>Categoría
+          <select name="category" value={form.category} onChange={handleChange}>
+            <option value="">(Ninguna)</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <input type="checkbox" name="active" checked={form.active} onChange={handleChange} /> Activa
+        </label>
+        <div>
+          <div style={{ marginBottom: 6 }}>Productos:</div>
+          <div style={{ maxHeight: 120, overflow: "auto", border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
+            {products.map(p => (
+              <label key={p.id} style={{ display: "inline-flex", gap: 6, marginRight: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={form.products.includes(p.id)}
+                  onChange={() => toggleProduct(p.id)}
+                />
+                <span>{p.name}</span>
               </label>
-              <label>Valor
-                <input name="value" type="number" step="0.01" value={form.value} onChange={onChange} />
-              </label>
-            </div>
+            ))}
+            {!products.length && <em>No hay productos cargados.</em>}
+          </div>
+        </div>
+        <button type="submit" disabled={saving}>
+          {saving ? "Guardando..." : "Guardar promoción"}
+        </button>
+      </form>
 
-            <label>Aplica a categoría (opcional)
-              <select name="category" value={form.category} onChange={onChange}>
-                <option value="">(Ninguna)</option>
-                {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-
-            <div>
-              <div style={{marginBottom:6}}>O a productos específicos (opcional):</div>
-              <div style={{maxHeight:120, overflow:"auto", border:"1px solid #eee", padding:8, borderRadius:6}}>
-                {products.map(p => (
-                  <label key={p.id} style={{display:"inline-flex", gap:6, marginRight:12}}>
-                    <input
-                      type="checkbox"
-                      checked={form.products.includes(p.id)}
-                      onChange={() => toggleProduct(p.id)}
-                    />
-                    <span>{p.name}</span>
-                  </label>
-                ))}
-                {!products.length && <em>No hay productos cargados.</em>}
-              </div>
-            </div>
-
-            <label>
-              <input type="checkbox" name="active" checked={form.active} onChange={onChange} /> Activa
-            </label>
-
-            <button>Guardar promoción</button>
-          </form>
-        </section>
-
-        {/* Listado */}
-        <section style={{border:"1px solid #eee", borderRadius:8, padding:12}}>
-          <h3>Listado</h3>
-          <button onClick={load} disabled={loading}>{loading ? "Actualizando..." : "Actualizar"}</button>
-          <table style={{width:"100%", marginTop:12, borderCollapse:"collapse"}}>
-            <thead>
-              <tr>
-                <th style={{textAlign:"left"}}>Nombre</th>
-                <th>Tipo</th>
-                <th>Valor</th>
-                <th>Categoría</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {promos.map(p => (
-                <tr key={p.id} style={{borderTop:"1px solid #eee"}}>
-                  <td style={{textAlign:"left"}}>{p.name}</td>
-                  <td style={{textAlign:"center"}}>{TYPE_LABEL[p.type] || p.type}</td>
-                  <td style={{textAlign:"right"}}>{p.type === "PCT" ? `${p.value}%` : `$${p.value}`}</td>
-                  <td style={{textAlign:"center"}}>{p.category || "-"}</td>
-                  <td style={{textAlign:"center"}}>{p.active ? "Activa" : "Inactiva"}</td>
-                  <td style={{textAlign:"right"}}>
-                    {p.active
-                      ? <button onClick={()=>activar(p, false)}>Desactivar</button>
-                      : <button onClick={()=>activar(p, true)}>Activar</button>}
-                  </td>
-                </tr>
-              ))}
-              {!promos.length && !loading && (
-                <tr><td colSpan={6} style={{padding:8, color:"#666"}}>Sin promociones</td></tr>
-              )}
-            </tbody>
-          </table>
-        </section>
-      </div>
+      <table style={{ width: "100%", marginTop: 24, borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left" }}>Nombre</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Categoría</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {promos.map(promo => (
+            <tr key={promo.id} style={{ borderTop: "1px solid #eee" }}>
+              <td style={{ textAlign: "left" }}>{promo.name}</td>
+              <td style={{ textAlign: "center" }}>{TYPE_BADGE[promo.type] || promo.type}</td>
+              <td style={{ textAlign: "right" }}>{formatValue(promo)}</td>
+              <td style={{ textAlign: "center" }}>{categoryLookup.get(promo.category) || promo.category || "-"}</td>
+              <td style={{ textAlign: "center" }}>{promo.active ? "Activa" : "Inactiva"}</td>
+              <td style={{ textAlign: "right" }}>
+                <button onClick={() => handleToggleActive(promo, !promo.active)}>
+                  {promo.active ? "Desactivar" : "Activar"}
+                </button>
+                <button className="btn-secondary" onClick={() => handleDelete(promo)}>Eliminar</button>
+              </td>
+            </tr>
+          ))}
+          {!promos.length && !loading && (
+            <tr>
+              <td colSpan={6} style={{ padding: 8, color: "#666" }}>Sin promociones</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

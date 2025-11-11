@@ -1,25 +1,22 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: #f5f5f5;
+  background-color: #111;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  --primary-color: #d4af37;         /* Dorado botillería */
+  --accent-color: #7a5c00;
+  --background-dark: #111;
+  --card-bg: #1a1a1a;
+  --border: #333;
 }
 
 body {
@@ -28,41 +25,155 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--background-dark);
+  color: var(--primary-color);
+}
+
+a {
+  font-weight: 500;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+a:hover {
+  color: #ffd700;
+}
+
+h1, h2, h3, h4 {
+  color: #fefefe;
+  font-weight: 600;
+  margin-bottom: 0.3em;
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-size: 2.8em;
+}
+h2 {
+  font-size: 2em;
 }
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--primary-color);
+  background-color: var(--card-bg);
+  color: var(--primary-color);
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: background-color 0.25s, color 0.25s, border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  background-color: var(--primary-color);
+  color: #111;
+  border-color: var(--primary-color);
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 3px solid var(--primary-color);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+input, select, textarea {
+  padding: 0.5em 0.8em;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background-color: #222;
+  color: #f5f5f5;
+  font-family: inherit;
+  font-size: 1em;
+  transition: border-color 0.3s ease;
 }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 0.75em;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background-color: #1a1a1a;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+tr:nth-child(even) {
+  background-color: #151515;
+}
+tr:hover {
+  background-color: #222;
+}
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2em;
+  margin: 1em 0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.msg-ok {
+  background-color: #1c4423;
+  color: #b8ffb3;
+  padding: 0.6em;
+  border-radius: 6px;
+  margin: 0.5em 0;
+}
+
+.msg-error {
+  background-color: #4b1c1c;
+  color: #ffb3b3;
+  padding: 0.6em;
+  border-radius: 6px;
+  margin: 0.5em 0;
+}
+
+.navbar {
+  background-color: #1a1a1a;
+  padding: 1em 1.5em;
+  display: flex;
+  align-items: center;
+  gap: 1.2em;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.navbar .brand {
+  font-size: 1.3em;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-right: auto;
+}
+.nav-link {
+  color: #ccc;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+.nav-link:hover, .nav-link.active {
+  color: var(--primary-color);
+}
+.btn-ghost {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  color: var(--primary-color);
+}
+
+.main-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+
+

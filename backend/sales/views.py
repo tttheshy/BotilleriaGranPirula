@@ -5,10 +5,9 @@ from .serializers import SaleSerializer
 from .services import checkout_sale, void_sale
 from rest_framework import views, permissions
 from rest_framework.response import Response
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from catalog.models import Product
-from promos.services import _unit_discount_for
-# ← NUEVO: importamos DTE y AuditLog para crear el DTE y registrar bitácora
+from promos.services import best_unit_discount, get_active_promotions
 from dte.models import DTE
 from audit.models import AuditLog
 
@@ -18,9 +17,8 @@ class SaleViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # 👇 tu modelo usa 'user'
         sale = serializer.save(user=self.request.user)
-        checkout_sale(sale)  # baja stock + calcula total
+        checkout_sale(sale)
         DTE.objects.create(sale=sale, status="PENDING")
         AuditLog.objects.create(
             actor=self.request.user,
@@ -45,6 +43,14 @@ class SaleViewSet(viewsets.ModelViewSet):
         )
         return response.Response({"status": "VOID"}, status=status.HTTP_200_OK)
 
+
+CLP_QUANT = Decimal("1")
+
+
+def _clp(value: Decimal) -> Decimal:
+    return value.quantize(CLP_QUANT, rounding=ROUND_HALF_UP)
+
+
 class SalePreviewView(views.APIView):
     """
     Recibe: { items: [{product, qty, unit_price}] }
@@ -56,16 +62,17 @@ class SalePreviewView(views.APIView):
     def post(self, request):
         items = request.data.get("items", [])
         if not isinstance(items, list):
-            return Response({"error":"items debe ser lista"}, status=400)
+            return Response({"error": "items debe ser lista"}, status=400)
 
-        # cache simple de productos
         prod_ids = [it.get("product") for it in items if it.get("product")]
         prods = {p.id: p for p in Product.objects.filter(id__in=prod_ids).select_related("category")}
 
         out = []
         total_bruto = Decimal("0")
-        total_desc   = Decimal("0")
-        total_neto   = Decimal("0")
+        total_desc = Decimal("0")
+        total_neto = Decimal("0")
+
+        promos = get_active_promotions()
 
         for it in items:
             pid = it.get("product")
@@ -78,36 +85,29 @@ class SalePreviewView(views.APIView):
             if not product:
                 continue
 
-            # misma regla: mejor promo (no acumulada)
-            disc_unit = _unit_discount_for(product, unit_price, promo=None)  # placeholder
-            from promos.models import Promotion
-            best = Decimal("0")
-            for promo in Promotion.objects.filter(active=True).select_related("category").prefetch_related("products"):
-                d = _unit_discount_for(product, unit_price, promo)
-                if d > best:
-                    best = d
-            disc_unit = best
+            disc_unit = best_unit_discount(product, unit_price, promos)
 
-            line_bruto = unit_price * qty
-            line_desc  = disc_unit * qty
-            line_neto  = (unit_price - disc_unit) * qty
+            qty_dec = Decimal(qty)
+            line_bruto = unit_price * qty_dec
+            line_desc = disc_unit * qty_dec
+            line_neto = (unit_price - disc_unit) * qty_dec
 
             total_bruto += line_bruto
-            total_desc  += line_desc
-            total_neto  += line_neto
+            total_desc += line_desc
+            total_neto += line_neto
 
             out.append({
                 "product": pid,
                 "name": product.name,
                 "qty": qty,
-                "unit_price": str(unit_price),
+                "unit_price": str(_clp(unit_price)),
                 "discount_unit": str(disc_unit),
-                "line_total": str(line_neto),
+                "line_total": str(_clp(line_neto)),
             })
 
         return Response({
             "items": out,
-            "total_bruto": str(total_bruto),
-            "total_descuento": str(total_desc),
-            "total_neto": str(total_neto),
+            "total_bruto": str(_clp(total_bruto)),
+            "total_descuento": str(_clp(total_desc)),
+            "total_neto": str(_clp(total_neto)),
         }, status=200)

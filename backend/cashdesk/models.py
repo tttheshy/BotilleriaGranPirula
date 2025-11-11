@@ -11,3 +11,9 @@ class CashSession(models.Model):
     diff = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     opened_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+
+    
+    @classmethod
+    def get_current(cls):
+        """Return the most recent open cash session, if any."""
+        return cls.objects.filter(status=cls.OPEN).order_by("-opened_at").first()

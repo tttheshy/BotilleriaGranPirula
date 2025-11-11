@@ -1,5 +1,5 @@
 from django.db import models
-from catalog.models import Product, Category
+from catalog.models import Product, Category 
 
 class Promotion(models.Model):
     PCT, FIXED = "PCT","FIXED"

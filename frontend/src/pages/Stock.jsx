@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 import { useMe } from "../useMe";
+import { formatMoney } from "../utils/money";
 
 export default function Stock() {
   const { me } = useMe();
@@ -11,7 +12,6 @@ export default function Stock() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: "", price: "", stock: "" });
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -19,7 +19,7 @@ export default function Stock() {
   const load = async () => {
     setLoading(true); setMsg("");
     try {
-      const { data } = await api.get("/inventory/stock/"); 
+      const { data } = await api.get("/products/");
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
       setMsg(e?.response?.status === 401 ? "No autenticado" : "Error cargando stock");
@@ -34,7 +34,13 @@ export default function Stock() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  const filtered = rows.filter(r => (r.name || "").toLowerCase().includes(q.toLowerCase()));
+  const needle = q.trim().toLowerCase();
+  const filtered = rows.filter(r => {
+    if (!needle) return true;
+    const name = (r.name || "").toLowerCase();
+    const code = (r.code || "").toString().toLowerCase();
+    return name.includes(needle) || code.includes(needle);
+  });
 
   const startEdit = (row) => {
     setEditingId(row.id);
@@ -122,13 +128,25 @@ export default function Stock() {
               <tr key={r.id} style={{borderTop:"1px solid var(--border)"}}>
                 <td>
                   {isEditing ? (
-                    <input name="name" value={form.name} onChange={onChange} />
-                  ) : r.name}
+                    <>
+                      <input name="name" value={form.name} onChange={onChange} />
+                      <div style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
+                        Código: {r.code || "—"}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {r.name}
+                      <div style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
+                        Código: {r.code || "—"}
+                      </div>
+                    </>
+                  )}
                 </td>
                 <td style={{textAlign:"right"}}>
                   {isEditing ? (
                     <input name="price" type="number" step="0.01" min="0" value={form.price} onChange={onChange} />
-                  ) : `$${r.price}`}
+                  ) : formatMoney(r.price)}
                 </td>
                 <td style={{textAlign:"center"}}>
                   {isEditing ? (
