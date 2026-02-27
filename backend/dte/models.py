@@ -1,4 +1,3 @@
-# dte/models.py
 from django.db import models
 from sales.models import Sale
 

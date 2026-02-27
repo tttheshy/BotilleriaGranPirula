@@ -10,11 +10,27 @@ export default function ProductoNuevo() {
   });
   const [cats, setCats] = useState([]);
   const [msg, setMsg] = useState("");
+  const [toast, setToast] = useState(null);
+  const toastTimeout = useRef(null);
+  const lastCodeCheck = useRef("");
   const [scanning, setScanning] = useState(false);   // estado de teclado/lector
   const [cameraOpen, setCameraOpen] = useState(false); // ⬅️ nuevo: modal cámara
 
   // Ref para el input del código para enfocarlo automáticamente
   const codeInputRef = useRef(null);
+  const showToast = (text, type = "info", delay = 2500) => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast(text ? { text, type } : null);
+    if (text && delay > 0) {
+      toastTimeout.current = setTimeout(() => setToast(null), delay);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -38,8 +54,8 @@ export default function ProductoNuevo() {
       if (cameraOpen) return; // ⬅️ no interferir con la cámara
 
       // Si el usuario está escribiendo en otro campo, no capturamos
-      if (document.activeElement !== codeInputRef.current && 
-          document.activeElement.tagName === 'INPUT') {
+      // Si el usuario est� escribiendo en cualquier input, no capturamos
+      if (document.activeElement && document.activeElement.tagName === "INPUT") {
         return;
       }
 
@@ -47,6 +63,8 @@ export default function ProductoNuevo() {
       if (e.key === "Enter" && buffer.length > 0) {
         e.preventDefault();
         setForm(f => ({ ...f, code: buffer }));
+        showToast(`Codigo detectado: ${buffer}`, "success");
+        checkDuplicateCode(buffer);
         setScanning(false);
         buffer = "";
         if (timeout) clearTimeout(timeout);
@@ -63,6 +81,8 @@ export default function ProductoNuevo() {
         timeout = setTimeout(() => {
           if (buffer.length > 0) {
             setForm(f => ({ ...f, code: buffer }));
+            showToast(`Codigo detectado: ${buffer}`, "success");
+            checkDuplicateCode(buffer);
             setScanning(false);
           }
           buffer = "";
@@ -82,17 +102,32 @@ export default function ProductoNuevo() {
     setForm(f => ({ ...f, [name]: type === "checkbox" ? checked : value }));
   };
 
+  const checkDuplicateCode = async (raw) => {
+    const code = String(raw || "").trim();
+    if (!code || code === lastCodeCheck.current) return;
+    lastCodeCheck.current = code;
+    try {
+      const { data } = await api.get(`/products/?search=${encodeURIComponent(code)}`);
+      const list = Array.isArray(data) ? data : [];
+      const match = list.find((item) => (item.code || "").toString().toLowerCase() === code.toLowerCase());
+      if (match) {
+        showToast(`El codigo ${code} ya existe (${match.name}).`, "warn", 3500);
+      }
+    } catch {
+      // si falla la busqueda, omitimos la alerta
+    }
+  };
+
   const crearCategoriaRapida = async () => {
-    const nombre = prompt("Nombre de la categoría:");
+    const nombre = prompt("Nombre de la categoria:");
     if (!nombre) return;
     try {
       const { data } = await api.post("/categories/", { name: nombre });
       setCats(c => [...c, data]);
       setForm(f => ({ ...f, category: data.id }));
-      setMsg("✅ Categoría creada.");
-      setTimeout(() => setMsg(""), 2000);
-    } catch { 
-      setMsg("❌ No se pudo crear la categoría (¿permisos?)."); 
+      showToast("Categoria creada.", "success");
+    } catch {
+      showToast("No se pudo crear la categoria (permisos?).", "error", 3500);
     }
   };
 
@@ -116,7 +151,7 @@ export default function ProductoNuevo() {
         top_seller: !!form.top_seller
       };
       await api.post("/products/", payload);
-      setMsg("✅ Producto creado correctamente.");
+      showToast("Producto creado correctamente.", "success");
       setForm({ 
         code: "", name: "", category: "", price: "", 
         stock: 0, active: true, top_seller: false 
@@ -129,14 +164,14 @@ export default function ProductoNuevo() {
       
     } catch (err) {
       if (err?.response?.status === 403) {
-        setMsg("❌ Sin permisos: solo Dueño/Admin pueden crear productos.");
+        showToast("Sin permisos: solo Dueno/Admin pueden crear productos.", "error", 3500);
       } else if (err?.response?.status === 400) {
-        const detail = err?.response?.data?.code?.[0] || 
-                      err?.response?.data?.detail || 
-                      "Datos inválidos o código duplicado.";
-        setMsg(`❌ ${detail}`);
+        const codeMsg = err?.response?.data?.code?.[0];
+        const detail = codeMsg || err?.response?.data?.detail || "Datos invalidos.";
+        const isDuplicate = !!codeMsg || /codigo/i.test(detail);
+        showToast(detail, isDuplicate ? "error" : "warn", 3500);
       } else {
-        setMsg("❌ Error al crear producto. Revisa el backend.");
+        showToast("Error al crear producto. Revisa el backend.", "error", 3500);
       }
     }
   };
@@ -185,6 +220,7 @@ export default function ProductoNuevo() {
                 name="code" 
                 value={form.code} 
                 onChange={onChange} 
+                onBlur={(e) => checkDuplicateCode(e.target.value)}
                 placeholder="Escanea o escribe el código"
                 autoFocus
                 style={{ flex:1 }}
@@ -197,9 +233,6 @@ export default function ProductoNuevo() {
                  Escanear
               </button>
             </div>
-            <small style={{color:"var(--muted)", fontSize:11}}>
-              Puedes usar un lector de código de barras, escribir manualmente o escanear con la cámara.
-            </small>
           </div>
 
           <div>
@@ -326,13 +359,42 @@ export default function ProductoNuevo() {
           onClose={() => setCameraOpen(false)}
           onDetected={(code) => {
             setForm(f => ({ ...f, code }));
-            setMsg(`✅ Código detectado: ${code}`);
-            alert(`Código detectado: ${code}`);
+            showToast(`Codigo detectado: ${code}`, "success");
+            checkDuplicateCode(code);
             setCameraOpen(false);
             setTimeout(() => codeInputRef.current?.focus(), 50);
           }}
           
         />
+
+      {toast?.text && (
+        <div
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: 20,
+            zIndex: 20,
+            minWidth: 260,
+            maxWidth: 360,
+            padding: "12px 14px",
+            borderRadius: 12,
+            color: "#fff",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            background:
+              toast.type === "success"
+                ? "linear-gradient(135deg, rgba(40,167,69,0.95), rgba(32,201,151,0.95))"
+                : toast.type === "error"
+                ? "linear-gradient(135deg, rgba(220,53,69,0.95), rgba(255,99,132,0.95))"
+                : "linear-gradient(135deg, rgba(255,193,7,0.95), rgba(255,159,28,0.95))",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            {toast.type === "success" ? "Operacion exitosa" : "Aviso"}
+          </div>
+          <div>{toast.text}</div>
+        </div>
+      )}
 
     </div>
   );

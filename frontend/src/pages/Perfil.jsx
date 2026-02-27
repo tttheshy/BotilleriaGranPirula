@@ -92,8 +92,8 @@ export default function Perfil() {
         <h3 style={{ marginTop: 0 }}>Información adicional</h3>
         <ul style={{ margin: 0, paddingLeft: 20, lineHeight: "1.8em" }}>
           <li><strong>ID:</strong> {me.id}</li>
-          <li><strong>Staff:</strong> {me.is_staff ? "✅ Sí" : "— No"}</li>
-          <li><strong>Superuser:</strong> {me.is_superuser ? "✅ Sí" : "— No"}</li>
+          <li><strong>Staff:</strong> {me.is_staff ? " Sí" : "— No"}</li>
+          <li><strong>Superuser:</strong> {me.is_superuser ? " Sí" : "— No"}</li>
         </ul>
       </section>
     </div>

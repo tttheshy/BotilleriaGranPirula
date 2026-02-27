@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import ymd from "../utils/ymd";
+import { useMe } from "../useMe";
 
 export default function VentasDia() {
+  const { me } = useMe();
+  const role = (me?.role || "").toString().toUpperCase();
+  const isAdmin = ["OWNER", "ADMIN"].includes(role) || me?.is_staff || me?.is_superuser;
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -106,6 +110,24 @@ export default function VentasDia() {
     }
   };
 
+  const downloadBoleta = async (saleId) => {
+    setMsg("");
+    try {
+      const { data } = await api.get(`/dte/boleta/${saleId}/`, { responseType: "blob" });
+      const blob = new Blob([data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `boleta_${saleId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setMsg("No se pudo descargar la boleta.");
+    }
+  };
+
   return (
     <div className="container">
       <h2>Ventas del día</h2>
@@ -137,6 +159,7 @@ export default function VentasDia() {
             <th>Método</th>
             <th>Estado</th>
             <th>Total</th>
+            <th>Boleta</th>
             <th></th>
           </tr>
         </thead>
@@ -152,12 +175,14 @@ export default function VentasDia() {
                 items={items}
                 onToggle={() => toggleOpen(v.id)}
                 onAnular={() => anular(v.id)}
+                canVoid={isAdmin}
+                onBoleta={() => downloadBoleta(v.id)}
               />
             );
           })}
           {!ventasHoy.length && !loading && (
             <tr>
-              <td colSpan={8} style={{ padding: 8, color: "#666" }}>
+              <td colSpan={9} style={{ padding: 8, color: "#666" }}>
                 Sin ventas hoy
               </td>
             </tr>
@@ -168,13 +193,13 @@ export default function VentasDia() {
   );
 }
 
-function FragmentRow({ venta, abierto, items, onToggle, onAnular }) {
+function FragmentRow({ venta, abierto, items, onToggle, onAnular, canVoid, onBoleta }) {
   return (
     <>
       <tr style={{ borderTop: "1px solid #eee" }}>
         <td style={{ textAlign: "left", width: 36 }}>
           <button className="btn-secondary" onClick={onToggle}>
-            {abierto ? "−" : "+"}
+            {abierto ? "-" : "+"}
           </button>
         </td>
         <td style={{ textAlign: "left" }}>{venta.id}</td>
@@ -185,9 +210,14 @@ function FragmentRow({ venta, abierto, items, onToggle, onAnular }) {
         <td style={{ textAlign: "center" }}>{venta.payment_method}</td>
         <td style={{ textAlign: "center" }}>{venta.status}</td>
         <td style={{ textAlign: "right" }}>{formatMoney(venta.total)}</td>
+        <td style={{ textAlign: "center" }}>
+          <button className="btn-secondary" onClick={onBoleta} disabled={venta.status !== "OK"}>
+            Boleta
+          </button>
+        </td>
         <td style={{ textAlign: "right" }}>
           {venta.status === "OK" ? (
-            <button onClick={onAnular}>Anular</button>
+            canVoid ? <button onClick={onAnular}>Anular</button> : <em>-</em>
           ) : (
             <em>Anulada</em>
           )}
@@ -196,7 +226,7 @@ function FragmentRow({ venta, abierto, items, onToggle, onAnular }) {
 
       {abierto && (
         <tr>
-          <td colSpan={8} style={{ background: "rgba(255,255,255,.03)" }}>
+          <td colSpan={9} style={{ background: "rgba(255,255,255,.03)" }}>
             <ItemsTable items={items} />
           </td>
         </tr>
@@ -300,3 +330,6 @@ function formatMoney(value) {
     maximumFractionDigits: 0,
   });
 }
+
+
+

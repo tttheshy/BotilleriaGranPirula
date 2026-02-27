@@ -1,10 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import api from "../api";
-
-const TYPE_OPTIONS = [
-  { value: "PCT", label: "Porcentaje (%)" },
-  { value: "FIXED", label: "Monto fijo ($)" },
-];
 
 const TYPE_BADGE = {
   PCT: "%",
@@ -17,29 +12,36 @@ const CLP = new Intl.NumberFormat("es-CL", {
   maximumFractionDigits: 0,
 });
 
-const EMPTY_FORM = {
+const EMPTY_FORM = () => ({
   name: "",
   type: "PCT",
   value: "",
   active: true,
   category: "",
   products: [],
-};
+});
 
 export default function Promos() {
   const [promos, setPromos] = useState([]);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(() => EMPTY_FORM());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [productSearch, setProductSearch] = useState("");
 
   const categoryLookup = useMemo(() => {
     const map = new Map();
     categories.forEach((cat) => map.set(cat.id, cat.name));
     return map;
   }, [categories]);
+
+  const productLookup = useMemo(() => {
+    const map = new Map();
+    products.forEach((prod) => map.set(prod.id, prod));
+    return map;
+  }, [products]);
 
   const loadData = async () => {
     setLoading(true);
@@ -48,18 +50,11 @@ export default function Promos() {
       const [promRes, catRes, prodRes] = await Promise.all([
         api.get("/promotions/"),
         api.get("/categories/"),
-        api.get("/products/?page_size=1000"),
+        api.get("/products/"),
       ]);
-
       setPromos(Array.isArray(promRes.data) ? promRes.data : []);
       setCategories(Array.isArray(catRes.data) ? catRes.data : []);
-      setProducts(
-        Array.isArray(prodRes.data?.results)
-          ? prodRes.data.results
-          : Array.isArray(prodRes.data)
-          ? prodRes.data
-          : [],
-      );
+      setProducts(Array.isArray(prodRes.data) ? prodRes.data : []);
     } catch (error) {
       console.error("Error al cargar datos de promociones", error);
       setMessage({ type: "error", text: "No se pudieron cargar las promociones." });
@@ -80,14 +75,12 @@ export default function Promos() {
     }));
   };
 
-  const toggleProduct = (productId) => {
+  const handleToggleProduct = (id) => {
     setForm((prev) => {
-      const hasProduct = prev.products.includes(productId);
+      const exists = prev.products.includes(id);
       return {
         ...prev,
-        products: hasProduct
-          ? prev.products.filter((id) => id !== productId)
-          : [...prev.products, productId],
+        products: exists ? prev.products.filter((pid) => pid !== id) : [...prev.products, id],
       };
     });
   };
@@ -111,10 +104,9 @@ export default function Promos() {
         category: form.category || null,
         products: form.products,
       };
-
       await api.post("/promotions/", payload);
       setMessage({ type: "success", text: "Promoción creada correctamente." });
-      setForm(EMPTY_FORM);
+      setForm(EMPTY_FORM());
       await loadData();
     } catch (error) {
       if (error?.response?.status === 403) {
@@ -134,7 +126,7 @@ export default function Promos() {
       await loadData();
     } catch (error) {
       console.error("Error al cambiar estado de la promoción", error);
-      setMessage({ type: "error", text: "No se pudo cambiar el estado de la promoción." });
+      setMessage({ type: "error", text: "No se pudo cambiar el estado." });
     }
   };
 
@@ -164,6 +156,21 @@ export default function Promos() {
     return Number.isFinite(numeric) ? CLP.format(numeric) : promo.value;
   };
 
+  const stockedProducts = useMemo(
+    () => products.filter((p) => Number(p.stock) > 0),
+    [products]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const needle = productSearch.trim().toLowerCase();
+    if (!needle) return stockedProducts;
+    return stockedProducts.filter((p) => {
+      const name = (p.name || "").toLowerCase();
+      const code = (p.code || "").toString().toLowerCase();
+      return name.includes(needle) || code.includes(needle);
+    });
+  }, [stockedProducts, productSearch]);
+
   return (
     <div style={{ maxWidth: 1000, margin: "20px auto" }}>
       <h2>Promociones</h2>
@@ -183,42 +190,90 @@ export default function Promos() {
         <label>Nombre
           <input name="name" value={form.name} onChange={handleChange} placeholder="Ej: 10% bebidas" />
         </label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <label>Tipo
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <label style={{ flex: "1 1 200px" }}>Tipo
             <select name="type" value={form.type} onChange={handleChange}>
               <option value="PCT">Porcentaje (%)</option>
               <option value="FIXED">Monto fijo ($)</option>
             </select>
           </label>
-          <label>Valor
+          <label style={{ flex: "1 1 200px" }}>Valor
             <input name="value" type="number" step="1" value={form.value} onChange={handleChange} />
           </label>
         </div>
         <label>Categoría
           <select name="category" value={form.category} onChange={handleChange}>
             <option value="">(Ninguna)</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
           </select>
         </label>
-        <label>
-          <input type="checkbox" name="active" checked={form.active} onChange={handleChange} /> Activa
-        </label>
-        <div>
-          <div style={{ marginBottom: 6 }}>Productos:</div>
-          <div style={{ maxHeight: 120, overflow: "auto", border: "1px solid #eee", padding: 8, borderRadius: 6 }}>
-            {products.map(p => (
-              <label key={p.id} style={{ display: "inline-flex", gap: 6, marginRight: 12 }}>
+        <fieldset style={{ border: "1px solid #eee", borderRadius: 8, padding: 12 }}>
+          <legend style={{ padding: "0 8px" }}>Productos específicos</legend>
+          <p style={{ marginTop: 0, color: "#666", fontSize: 14 }}>
+            Marca productos en stock para aplicar esta promoción
+          </p>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <input
+              style={{ flex: 1, padding: "6px 8px" }}
+              placeholder="Buscar por nombre o SKU"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+            <small style={{ color: "#666" }}>
+              {filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"}
+            </small>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 10,
+              maxHeight: 260,
+              overflowY: "auto",
+            }}
+          >
+            {filteredProducts.map((product) => (
+              <label
+                key={product.id}
+                style={{
+                  border: "1px solid var(--border, #ddd)",
+                  borderRadius: 8,
+                  padding: 10,
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr",
+                  gap: 10,
+                  alignItems: "center",
+                  fontSize: 14,
+                  background: form.products.includes(product.id) ? "#f0fdf4" : "white",
+                }}
+              >
                 <input
                   type="checkbox"
-                  checked={form.products.includes(p.id)}
-                  onChange={() => toggleProduct(p.id)}
+                  checked={form.products.includes(product.id)}
+                  onChange={() => handleToggleProduct(product.id)}
                 />
-                <span>{p.name}</span>
+                <div>
+                  <div style={{ fontWeight: 600, color: "#111" }}>{product.name}</div>
+                  <small style={{ color: "#777" }}>
+                    SKU: {product.code || "—"} · Stock: {product.stock}
+                  </small>
+                </div>
               </label>
             ))}
-            {!products.length && <em>No hay productos cargados.</em>}
+            {!filteredProducts.length && (
+              <p style={{ gridColumn: "1 / -1", color: "#888", textAlign: "center", padding: 12 }}>
+                {productSearch.trim()
+                  ? "Sin coincidencias para la búsqueda."
+                  : "No hay productos con stock disponible."}
+              </p>
+            )}
           </div>
-        </div>
+        </fieldset>
+        <label>
+          <input type="checkbox" name="active" checked={form.active} onChange={handleChange} /> Activar promoción
+        </label>
         <button type="submit" disabled={saving}>
           {saving ? "Guardando..." : "Guardar promoción"}
         </button>
@@ -231,29 +286,43 @@ export default function Promos() {
             <th>Tipo</th>
             <th>Valor</th>
             <th>Categoría</th>
+            <th>Productos</th>
             <th>Estado</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {promos.map(promo => (
+          {promos.map((promo) => (
             <tr key={promo.id} style={{ borderTop: "1px solid #eee" }}>
               <td style={{ textAlign: "left" }}>{promo.name}</td>
               <td style={{ textAlign: "center" }}>{TYPE_BADGE[promo.type] || promo.type}</td>
               <td style={{ textAlign: "right" }}>{formatValue(promo)}</td>
               <td style={{ textAlign: "center" }}>{categoryLookup.get(promo.category) || promo.category || "-"}</td>
+              <td style={{ textAlign: "left" }}>
+                {promo.products && promo.products.length ? (
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {promo.products.map((pid) => (
+                      <li key={pid}>{productLookup.get(pid)?.name || `ID ${pid}`}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <em style={{ color: "#888" }}>—</em>
+                )}
+              </td>
               <td style={{ textAlign: "center" }}>{promo.active ? "Activa" : "Inactiva"}</td>
               <td style={{ textAlign: "right" }}>
-                <button onClick={() => handleToggleActive(promo, !promo.active)}>
+                <button type="button" onClick={() => handleToggleActive(promo, !promo.active)}>
                   {promo.active ? "Desactivar" : "Activar"}
                 </button>
-                <button className="btn-secondary" onClick={() => handleDelete(promo)}>Eliminar</button>
+                <button type="button" className="btn-secondary" onClick={() => handleDelete(promo)}>
+                  Eliminar
+                </button>
               </td>
             </tr>
           ))}
           {!promos.length && !loading && (
             <tr>
-              <td colSpan={6} style={{ padding: 8, color: "#666" }}>Sin promociones</td>
+              <td colSpan={7} style={{ padding: 8, color: "#666" }}>Sin promociones</td>
             </tr>
           )}
         </tbody>
@@ -261,3 +330,5 @@ export default function Promos() {
     </div>
   );
 }
+
+

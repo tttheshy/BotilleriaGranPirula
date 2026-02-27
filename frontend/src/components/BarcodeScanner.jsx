@@ -1,4 +1,3 @@
-// src/components/BarcodeScanner.jsx
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { DecodeHintType, BarcodeFormat } from "@zxing/library";
@@ -151,7 +150,7 @@ export default function BarcodeScanner({ onResult, facingMode = "environment" })
             firingRef.current = true;
             onResult?.(text);
 
-            // 🔒 detiene el lector completamente después de detectar
+            // detiene el lector completamente después de detectar
             try { readerRef.current?.reset?.(); } catch {}
             readerRef.current = null;
             stopStreamOnly();

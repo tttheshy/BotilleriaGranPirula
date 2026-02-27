@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "./api";
-import { clearToken, getToken } from "./auth";
+import { clearToken, getAccessToken } from "./auth";
 
 export function useMe() {
   const [me, setMe] = useState(null);
@@ -8,7 +8,7 @@ export function useMe() {
 
   const refresh = async () => {
     setLoading(true);
-    const token = getToken();
+    const token = getAccessToken();
     if (!token) {
       setMe(null);
       setLoading(false);
